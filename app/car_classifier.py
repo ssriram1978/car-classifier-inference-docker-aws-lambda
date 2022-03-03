@@ -13,7 +13,7 @@ from pathlib import Path
 stream_handler = logging.StreamHandler()
 stream_handler.setLevel(logging.INFO)
 
-logging.basicConfig(level=logging.DEBUG,
+logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(module)s %(funcName)s %(message)s')
 
 
@@ -38,7 +38,6 @@ class CarClassifier:
         "SriramSridhar78/sriram-car-classifier")
         """
         model_path = os.path.join(Path(__file__).parent.absolute(), "model")
-        print(f'model_path={model_path}')
         self._imported_model = AutoModelForImageClassification.from_pretrained(
             pretrained_model_name_or_path=model_path)
 
@@ -52,11 +51,11 @@ class CarClassifier:
                 img = Image.fromarray(img)
             else:
                 img = image
+            print("Tranforming the image...")
             img = self._transform(img)
             img = img.unsqueeze(0)
+            print("Performing a forward pass on the model...")
             output = self._imported_model(img)
-            # print(f'output={output}')
-            # softmax_val = numpy.array(output.logits.softmax(dim=1).detach().numpy())
             softmax_val = output.logits.softmax(dim=1)
 
             # print(f'output.logits.softmax(dim=1) = {output.logits.softmax(dim=1)}')
@@ -67,24 +66,19 @@ class CarClassifier:
 
             # print(f'torch.topk(softmax_val, k=3, dim=1) = {torch.topk(softmax_val, k=3, dim=1)}')
             scores, indices = torch.topk(softmax_val, k=2, dim=1)
-            # scores = [[0.3, 0.5, 0.1]] 1,3, 1
-            # scores.squeeze() = [0.3, 0.5, 0.1] 1, 32
+            # Squeeze the dimensions. Example: scores = [[0.3, 0.5, 0.1]] 1,3, 1 => scores.squeeze() = [0.3, 0.5,
+            # 0.1] 1, 3, 1
             scores = scores.squeeze()  # squeeze last dimension
             indices = indices.squeeze()  # squeeze last dimension
-
+            infer_response_list = []
             for index, score in torch.stack((indices, scores), dim=1):
-                # if score < 0.1:
-                #    continue
-                infer_response += 'score={}, index={}.\n'.format(score, index)
-                infer_response += 'Could be {} with probability score of {}.\n'.format(self._imported_model.config.id2label[int(index)], score)
-
-            # get argmax with dim=1
-            # preds = output.logits.softmax(dim=1).argmax(dim=1)
-            # infer_response = self._imported_model.config.id2label[int(preds)]
-            # print(f'pred={preds}, original_label ={infer_response}')
+                infer_response_list.append('score={}, index={}.'.format(score, index))
+                infer_response_list.append('Could be {} with probability score of {}.\n'.format(
+                    self._imported_model.config.id2label[int(index)], score))
+            infer_response = '\n'.join(infer_response_list)
         except:
             traceback.print_exception(*sys.exc_info())
-        logging.info(infer_response)
+        print("infer_response = {}".format(infer_response))
         return infer_response
 
 
